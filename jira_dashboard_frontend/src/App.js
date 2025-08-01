@@ -59,13 +59,50 @@ function App() {
       const basicAuth = btoa(credentialString);
       const apiUrl = `https://${domain}/rest/api/3/myself`;
 
-      const resp = await fetch(apiUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Basic ${basicAuth}`,
-          'Accept': 'application/json'
+      let resp;
+      try {
+        resp = await fetch(apiUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Basic ${basicAuth}`,
+            'Accept': 'application/json'
+          }
+        });
+      } catch (fetchErr) {
+        // Network, DNS, CORS, or browser-level error (e.g. CORS)
+        let message = 'Unexpected error occurred – could not connect to Jira.';
+        if (
+          typeof fetchErr === 'object' &&
+          fetchErr !== null &&
+          (
+            fetchErr.name === 'TypeError' || // most fetch CORS errors are TypeError
+            (typeof fetchErr.message === 'string' && (
+              fetchErr.message.includes('Failed to fetch') ||
+              fetchErr.message.includes('NetworkError') ||
+              fetchErr.message.includes('CORS')
+            ))
+          )
+        ) {
+          message = (
+            'Could not connect to Jira. This is often due to CORS restrictions: Jira does not allow direct requests to its API from browsers. ' +
+            'Try running this dashboard with a server-side proxy, or contact your administrator. Your network or firewall may also block external API access.'
+          );
         }
-      });
+        setAuthState((prev) => ({
+          ...prev, authLoading: false, authenticated: false, credentials: null,
+          authError: message,
+        }));
+        return;
+      }
+
+      if (!resp) {
+        // Defensive: if fetch failed completely above
+        setAuthState((prev) => ({
+          ...prev, authLoading: false, authenticated: false, credentials: null,
+          authError: 'Could not send request to Jira.',
+        }));
+        return;
+      }
 
       if (resp.ok) {
         // Success!
@@ -93,9 +130,13 @@ function App() {
         }));
       }
     } catch (e) {
+      // Code-level or additional unknown error
       setAuthState((prev) => ({
         ...prev, authLoading: false, authenticated: false, credentials: null,
-        authError: 'Unexpected error occurred – could not connect to Jira.',
+        authError: (
+          'Unexpected error occurred – could not connect to Jira. ' +
+          (e && e.message ? `(${e.message})` : '')
+        ),
       }));
     }
   };
