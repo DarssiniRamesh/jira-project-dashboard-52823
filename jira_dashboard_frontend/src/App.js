@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 import LoginForm from './components/LoginForm';
+import Dashboard from './components/Dashboard';
 
 // PUBLIC_INTERFACE
 function App() {
@@ -93,16 +94,7 @@ function App() {
             error={authError}
           />
         ) : (
-          <div>
-            <h2 style={{ marginTop: '42px' }}>Welcome to Jira Project Dashboard</h2>
-            <p style={{ margin: '16px 0', color: 'var(--text-secondary)' }}>
-              You are now authenticated.<br />
-              <span style={{ fontSize: '0.95em', color: 'var(--text-secondary)' }}>
-                (Credentials are only stored in browser memory for your session. Dashboard content will appear here.)
-              </span>
-            </p>
-            {/* Future: Render dashboard components after authentication, using jiraCredentials */}
-          </div>
+          <Dashboard jiraCredentials={jiraCredentials} />
         )}
       </header>
     </div>
