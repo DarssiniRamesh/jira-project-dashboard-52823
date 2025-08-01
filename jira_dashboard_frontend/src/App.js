@@ -34,7 +34,7 @@ function App() {
   // PUBLIC_INTERFACE
   const toggleTheme = () => setTheme((theme) => (theme === 'light' ? 'dark' : 'light'));
 
-  // PUBLIC_INTERFACE: Handles logging in
+  // PUBLIC_INTERFACE: Handles logging in (direct Jira API call with robust CORS error handling)
   const handleLogin = async ({ email, domain, token }) => {
     setAuthState((prev) => ({
       authenticated: false,
@@ -60,6 +60,7 @@ function App() {
       const apiUrl = `https://${domain}/rest/api/3/myself`;
 
       let resp;
+      let fetchErr = null;
       try {
         resp = await fetch(apiUrl, {
           method: 'GET',
@@ -68,49 +69,62 @@ function App() {
             'Accept': 'application/json'
           }
         });
-      } catch (fetchErr) {
-        // Network, DNS, CORS, or browser-level error (e.g. CORS)
-        let message = 'Unexpected error occurred – could not connect to Jira.';
-        if (
+      } catch (e) {
+        fetchErr = e;
+      }
+
+      // Browser CORS detection: typically shows as TypeError/fetch failure *and* no 'resp'
+      if (fetchErr || !resp) {
+        const isLikelyCORS = (
           typeof fetchErr === 'object' &&
           fetchErr !== null &&
           (
-            fetchErr.name === 'TypeError' || // most fetch CORS errors are TypeError
+            fetchErr.name === 'TypeError' ||
             (typeof fetchErr.message === 'string' && (
               fetchErr.message.includes('Failed to fetch') ||
               fetchErr.message.includes('NetworkError') ||
               fetchErr.message.includes('CORS')
             ))
           )
-        ) {
+        );
+        let message = (
+          'Could not connect to Jira.'
+        );
+        if (isLikelyCORS) {
           message = (
-            'Could not connect to Jira. This is often due to CORS restrictions: Jira does not allow direct requests to its API from browsers. ' +
-            'Try running this dashboard with a server-side proxy, or contact your administrator. Your network or firewall may also block external API access.'
+            <>
+              Could not connect to Jira due to <b>CORS restrictions</b> (Cross-Origin Resource Sharing).<br /><br />
+              <b>Development/Testing Only:</b><br />
+              You can <b>try to bypass CORS</b> in two ways:<br />
+              <ol style={{textAlign:'left'}}>
+                <li><b>Use a browser extension like "Allow CORS"</b> (search your browser\'s extension store; enable only for testing and only on trusted sites).</li>
+                <li><b>Use an open CORS proxy</b>:<br />
+                  Example URL: <code>https://corsproxy.io/?{apiUrl}</code>
+                  <br />Modify the API domain in developer tools or with a browser extension to prepend a public CORS proxy (never enter real credentials into a public site unless you trust it!).</li>
+              </ol>
+              <div style={{color:"#ff5630", fontWeight:600, marginTop:8}}>
+                <b>Warning: Never use a public CORS proxy or CORS extension in production or with real project credentials!</b> These are for developer convenience only. Use a secure backend proxy for any real deployment.
+              </div>
+            </>
           );
         }
         setAuthState((prev) => ({
-          ...prev, authLoading: false, authenticated: false, credentials: null,
+          ...prev,
+          authLoading: false,
+          authenticated: false,
+          credentials: null,
           authError: message,
         }));
         return;
       }
 
-      if (!resp) {
-        // Defensive: if fetch failed completely above
-        setAuthState((prev) => ({
-          ...prev, authLoading: false, authenticated: false, credentials: null,
-          authError: 'Could not send request to Jira.',
-        }));
-        return;
-      }
-
+      // If response present, handle as usual
       if (resp.ok) {
-        // Success!
         setAuthState({
           authenticated: true,
           authLoading: false,
           authError: '',
-          credentials: { email, domain, token }, // never persisted; only in memory
+          credentials: { email, domain, token },
         });
         setProjectState({
           lastProjectFetchError: '',
@@ -118,24 +132,33 @@ function App() {
         });
       } else if (resp.status === 401 || resp.status === 403) {
         setAuthState((prev) => ({
-          ...prev, authLoading: false,
+          ...prev,
+          authLoading: false,
           authenticated: false,
           authError: 'Invalid credentials: Email/token or domain is incorrect.',
           credentials: null,
         }));
       } else {
+        // Could still be a "CORS" situation (e.g., opaque response), but we error in a generic way
         setAuthState((prev) => ({
-          ...prev, authLoading: false, authenticated: false, credentials: null,
-          authError: 'Could not authenticate – check your Jira domain and internet connection.',
+          ...prev,
+          authLoading: false,
+          authenticated: false,
+          credentials: null,
+          authError: 'Could not authenticate – check your Jira domain and internet connection. If using a CORS bypass, check the proxy or extension settings.',
         }));
       }
     } catch (e) {
-      // Code-level or additional unknown error
       setAuthState((prev) => ({
-        ...prev, authLoading: false, authenticated: false, credentials: null,
+        ...prev,
+        authLoading: false,
+        authenticated: false,
+        credentials: null,
         authError: (
-          'Unexpected error occurred – could not connect to Jira. ' +
-          (e && e.message ? `(${e.message})` : '')
+          <>
+            Unexpected error occurred – could not connect to Jira.
+            {e && e.message ? ` (${e.message})` : ''}
+          </>
         ),
       }));
     }

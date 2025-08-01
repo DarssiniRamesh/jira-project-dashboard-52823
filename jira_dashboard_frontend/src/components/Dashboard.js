@@ -35,20 +35,62 @@ function Dashboard({ jiraCredentials, onLogout, updateProjectContext, lastProjec
       if (typeof updateProjectContext === 'function') {
         updateProjectContext('', []);
       }
+      let resp;
+      let fetchErr = null;
       try {
         const apiUrl = `https://${domain}/rest/api/3/project/search?expand=lead,description,issueTypes`;
-        const resp = await fetch(apiUrl, {
+        resp = await fetch(apiUrl, {
           method: 'GET',
           headers: {
             'Authorization': `Basic ${basicAuth}`,
             'Accept': 'application/json'
           }
         });
-        if (!resp.ok) {
-          if (resp.status === 401 || resp.status === 403) {
+      } catch (e) {
+        fetchErr = e;
+      }
+
+      const isLikelyCORS =
+        fetchErr &&
+        typeof fetchErr === 'object' &&
+        (
+          fetchErr.name === 'TypeError' ||
+          (typeof fetchErr.message === 'string' && (
+            fetchErr.message.includes('Failed to fetch') ||
+            fetchErr.message.includes('NetworkError') ||
+            fetchErr.message.includes('CORS')
+          ))
+        );
+
+      if (isLikelyCORS || (!resp && fetchErr)) {
+        setFetchError(
+          <>
+            Could not fetch Jira project data due to <b>CORS restrictions</b> (Cross-Origin Resource Sharing).<br /><br />
+            <b>Development/Testing Only:</b>
+            <ul style={{textAlign:'left'}}>
+              <li>Try using a browser extension like <b>"Allow CORS"</b> (enable only for trusted sites and testing).</li>
+              <li>Or try open CORS proxies, e.g. <code>https://corsproxy.io/?[API_URL]</code>: Never use real credentials with a public proxy!</li>
+            </ul>
+            <div style={{color:"#ff5630", fontWeight:600, marginTop:8}}>
+              <b>Warning:</b> <u>Never</u> use CORS proxies or extensions with production data or actual Jira credentials.
+              For real deployments, use a secured backend proxy server.
+            </div>
+          </>
+        );
+        setProjects([]);
+        if (typeof updateProjectContext === 'function') {
+          updateProjectContext('Jira CORS error - see workaround/warning above.', []);
+        }
+        setLoading(false);
+        return;
+      }
+
+      try {
+        if (!resp || !resp.ok) {
+          if (resp && (resp.status === 401 || resp.status === 403)) {
             setFetchError('Project fetch failed: Authentication error. Your session may have expired or your credentials are invalid.');
             if (typeof onLogout === 'function') {
-              onLogout(); // Logout on authentication error (can't fetch projects)
+              onLogout();
               return;
             }
           } else {
