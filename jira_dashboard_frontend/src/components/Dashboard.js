@@ -1,28 +1,40 @@
 import React, { useEffect, useState } from 'react';
 import ProjectDashboard from './ProjectDashboard';
 
+/**
+ * Dashboard component now supports:
+ * - error context input and setter (caller can supply lastProjectFetchError & updateProjectContext)
+ * - logout callback for handling logout action
+ * - all sensitive info is cleared on logout or on credential loss
+ */
 // PUBLIC_INTERFACE
-function Dashboard({ jiraCredentials }) {
-  /**
-   * Fetches and displays the user's accessible Jira projects using the Jira REST API.
-   * @param {Object} jiraCredentials - { email, domain, token } for Basic Auth (in-memory only).
-   * UI: Handles loading and error states, prepares project data for dashboard rendering.
-   */
+function Dashboard({ jiraCredentials, onLogout, updateProjectContext, lastProjectFetchError }) {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Internal error state defaults to parent's context if provided; resets on credential change
   const [fetchError, setFetchError] = useState('');
 
   useEffect(() => {
-    if (!jiraCredentials) return;
+    if (!jiraCredentials) {
+      setProjects([]);
+      setLoading(false);
+      setFetchError('');
+      if (typeof updateProjectContext === 'function') {
+        updateProjectContext('', []);
+      }
+      return;
+    }
 
     const { domain, email, token } = jiraCredentials;
-    // Jira Basic Auth header: 'Basic <base64(email:token)>'
     const credentialString = `${email}:${token}`;
     const basicAuth = btoa(credentialString);
 
     const fetchProjects = async () => {
       setLoading(true);
       setFetchError('');
+      if (typeof updateProjectContext === 'function') {
+        updateProjectContext('', []);
+      }
       try {
         const apiUrl = `https://${domain}/rest/api/3/project/search?expand=lead,description,issueTypes`;
         const resp = await fetch(apiUrl, {
@@ -35,6 +47,10 @@ function Dashboard({ jiraCredentials }) {
         if (!resp.ok) {
           if (resp.status === 401 || resp.status === 403) {
             setFetchError('Project fetch failed: Authentication error. Your session may have expired or your credentials are invalid.');
+            if (typeof onLogout === 'function') {
+              onLogout(); // Logout on authentication error (can't fetch projects)
+              return;
+            }
           } else {
             setFetchError('Unable to fetch projects from Jira. Please retry or check your permissions.');
           }
@@ -43,20 +59,38 @@ function Dashboard({ jiraCredentials }) {
           const data = await resp.json();
           if (Array.isArray(data.values)) {
             setProjects(data.values);
+            setFetchError('');
+            if (typeof updateProjectContext === 'function') {
+              updateProjectContext('', data.values);
+            }
           } else {
             setProjects([]);
             setFetchError('No project data found or Jira API permissions insufficient.');
+            if (typeof updateProjectContext === 'function') {
+              updateProjectContext('No project data found or Jira API permissions insufficient.', []);
+            }
           }
         }
       } catch (e) {
         setFetchError('Unexpected error while fetching projects. Please check your connection or try again.');
         setProjects([]);
+        if (typeof updateProjectContext === 'function') {
+          updateProjectContext('Unexpected error while fetching projects. Please check your connection or try again.', []);
+        }
       }
       setLoading(false);
     };
 
     fetchProjects();
-  }, [jiraCredentials]);
+  }, [jiraCredentials, onLogout, updateProjectContext]);
+
+  // Always use top-down error context if present (for parent to control what is shown)
+  const errorMsg = lastProjectFetchError !== undefined && lastProjectFetchError !== null
+    ? lastProjectFetchError
+    : fetchError;
+
+  // Contextual loading state (cleared after logout/credential loss)
+  if (!jiraCredentials) return null;
 
   if (loading) {
     return (
@@ -67,12 +101,17 @@ function Dashboard({ jiraCredentials }) {
     );
   }
 
-  if (fetchError) {
+  if (errorMsg) {
     return (
       <div style={{
-        color: "#ff5630", fontSize: "1.15rem", margin: "42px auto", fontWeight: 500, textAlign: "center", maxWidth: 420
+        color: "#ff5630",
+        fontSize: "1.15rem",
+        margin: "42px auto",
+        fontWeight: 500,
+        textAlign: "center",
+        maxWidth: 420
       }}>
-        {fetchError}
+        {errorMsg}
       </div>
     );
   }
@@ -90,7 +129,7 @@ function Dashboard({ jiraCredentials }) {
     );
   }
 
-  // Use the ProjectDashboard for actual rendering
+  // Main project dashboard rendering
   return (
     <div style={{
       maxWidth: "1200px",
@@ -111,6 +150,5 @@ function Dashboard({ jiraCredentials }) {
     </div>
   );
 }
-
 
 export default Dashboard;
