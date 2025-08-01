@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import ProjectDashboard from './ProjectDashboard';
 
 // PUBLIC_INTERFACE
 function Dashboard({ jiraCredentials }) {
@@ -89,114 +90,27 @@ function Dashboard({ jiraCredentials }) {
     );
   }
 
-  // Prepare data for dashboard: project list
+  // Use the ProjectDashboard for actual rendering
   return (
     <div style={{
-      maxWidth: "1020px",
-      margin: "40px auto 24px auto",
-      padding: "0 16px",
+      maxWidth: "1200px",
+      margin: "30px auto 18px auto",
+      padding: "0 8px",
       textAlign: "left"
     }}>
-      <h3 style={{ color: "var(--text-primary)", marginBottom: 18, fontWeight: 700, fontSize: "2rem" }}>
+      <h2 style={{
+        color: "var(--text-primary)",
+        fontWeight: 700,
+        fontSize: "2rem",
+        margin: "0 0 16px 0",
+        letterSpacing: "-1px"
+      }}>
         Your Jira Projects
-      </h3>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-          gap: "20px"
-        }}
-      >
-        {projects.map(project => (
-          <div
-            key={project.id}
-            style={{
-              background: "var(--bg-secondary)",
-              borderRadius: 11,
-              boxShadow: "0 2px 8px rgba(30,54,89,0.06)",
-              padding: "24px 18px",
-              minHeight: 100,
-              display: "flex",
-              flexDirection: "column",
-              gap: "6px",
-              position: "relative"
-            }}
-          >
-            <div style={{display:"flex",alignItems:"center",gap:10}}>
-              {project.avatarUrls && project.avatarUrls["48x48"] &&
-                <img
-                  src={project.avatarUrls["48x48"]}
-                  alt="Avatar"
-                  style={{
-                    width: 34, height: 34,
-                    borderRadius: 7,
-                    border: "1px solid var(--border-color)",
-                    marginRight: 3,
-                  }}
-                />
-              }
-              <span style={{ fontWeight: 700, fontSize: '1.15rem' }}>
-                {project.name || "(No Name)"}
-              </span>
-              <span style={{
-                marginLeft: 7,
-                fontSize: '0.98em',
-                color: "#777",
-                background: "var(--bg-primary)",
-                borderRadius: 5,
-                padding: "2px 8px",
-                fontWeight: 600,
-                letterSpacing: "-0.5px"
-              }}>
-                {project.key}
-              </span>
-            </div>
-            <div style={{ fontSize: '0.98em', marginTop: 8}}>
-              Type: <span style={{ color: "var(--text-secondary)" }}>{project.projectTypeKey}</span>
-              {project.projectCategory && project.projectCategory.name && (
-                <>
-                  {" · "}
-                  <span>{project.projectCategory.name}</span>
-                </>
-              )}
-            </div>
-            <div style={{ fontSize: "0.96em", color: "#345" }}>
-              {project.lead &&
-                <>
-                  <span>Lead: <b>
-                    {project.lead.displayName || project.lead.name || "?"}
-                  </b>
-                  {project.lead.emailAddress ? (" · " + project.lead.emailAddress) : ""}
-                  </span>
-                </>
-              }
-            </div>
-            <div style={{ fontSize: '0.95em', marginTop: 5, color: "#333" }}>
-              Status: <b>{project.archived ? "Archived" : project.insight?.totalObjectCount === 0 ? "Active" : "Active"}</b>
-            </div>
-            {project.updated && (
-              <div style={{ fontSize: "0.94em", color: "#888" }}>
-                Updated: {new Date(project.updated).toLocaleString()}
-              </div>
-            )}
-            {project.description && typeof project.description === "string" && (
-              <div style={{
-                fontSize: "0.95em",
-                color: "#4d6884",
-                marginTop: 6,
-                opacity: 0.85,
-                maxHeight: 36,
-                overflow: "hidden",
-                textOverflow: "ellipsis"
-              }}>
-                {project.description}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+      </h2>
+      <ProjectDashboard projects={projects} />
     </div>
   );
 }
+
 
 export default Dashboard;
