@@ -1,1 +1,3 @@
-# jira-project-dashboard-52823
+# Project Repository
+
+This is the initial README file for the project.
