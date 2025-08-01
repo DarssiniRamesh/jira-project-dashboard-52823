@@ -1,0 +1,110 @@
+.login-form {
+  background: var(--bg-secondary);
+  border-radius: 14px;
+  max-width: 350px;
+  margin: 50px auto;
+  padding: 32px 28px 32px 28px;
+  box-shadow: 0 6px 24px 0 rgba(53,53,87,0.07);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.login-form-title {
+  margin-bottom: 12px;
+  color: var(--text-primary);
+  font-size: 1.4rem;
+  letter-spacing: -1px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.login-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 6px;
+}
+
+.login-form-group label {
+  font-size: 1rem;
+  color: var(--text-primary);
+  font-weight: 600;
+  margin-bottom: 2px;
+  letter-spacing: 0.2px;
+}
+
+.login-form-group input {
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  padding: 10px 12px;
+  outline: none;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  transition: border 0.2s;
+  font-size: 1rem;
+}
+
+.login-form-group input:focus {
+  border-color: var(--text-secondary);
+}
+
+.login-form-group input.invalid {
+  border-color: #ff5630;
+}
+
+.login-form-error {
+  color: #ff5630;
+  font-size: 0.88rem;
+  margin-top: 2px;
+  margin-left: 2px;
+}
+
+.login-form-submit {
+  background-color: var(--button-bg);
+  color: var(--button-text);
+  border: none;
+  border-radius: 8px;
+  padding: 12px 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(50,50,50,0.04);
+  margin-top: 14px;
+  transition: background 0.2s, opacity 0.2s;
+}
+
+.login-form-submit:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.login-form-server-error {
+  color: #ff5630;
+  margin-top: 11px;
+  font-size: 1rem;
+  text-align: center;
+  font-weight: 600;
+}
+
+.login-loading-spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid var(--button-text);
+  border-top: 3px solid var(--button-bg);
+  border-radius: 50%;
+  animation: login-spin 0.9s linear infinite;
+  vertical-align: middle;
+}
+
+@keyframes login-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 500px) {
+  .login-form {
+    max-width: 97vw;
+    padding: 20px 4vw;
+  }
+}
