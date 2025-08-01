@@ -1,12 +1,36 @@
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
+const helmet = require('helmet');
 
 const app = express();
 
-// Enable CORS for all origins (adjust as needed for production)
-app.use(cors());
+// --- CORS Policy ---
+// For development we allow all origins (wide open)
+// In production, restrict this to your frontend deployment URL(s), e.g.:
+//   const corsOptions = { origin: ['https://your-frontend-url.com'] };
+// For now, use environment variable or default to '*'
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',')
+  : ['*'];
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow non-browser tools (no origin) and all from allowedOrigins
+    if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'), false);
+  },
+  credentials: false, // no cookies/sessions
+};
+app.use(cors(corsOptions));
+
 app.use(express.json());
+app.use(helmet({
+  contentSecurityPolicy: false, // Let frontend handle own CSP
+  crossOriginEmbedderPolicy: false
+}));
+
 
 // Swagger-style openapi tags for documentation (manual for this minimal app)
 const OPENAPI_INFO = {
@@ -138,6 +162,19 @@ app.get('/', (req, res) => {
         description: "Proxies Jira project fetch"
       }
     ]
+  });
+});
+
+/**
+ * Global error handler for any uncaught errors (robust fallback).
+ * Never expose stack traces in production!
+ */
+app.use((err, req, res, next) => {
+  console.error('[SERVER ERROR]', err); // (Safe: no secrets ever logged)
+  return res.status(500).json({
+    error: 'Server error occurred. Please try again later.',
+    // Remove stack in prod
+    ...(process.env.NODE_ENV === 'development' && { detail: err.message || err.toString() })
   });
 });
 
