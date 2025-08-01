@@ -26,9 +26,8 @@ function Dashboard({ jiraCredentials, onLogout, updateProjectContext, lastProjec
     }
 
     const { domain, email, token } = jiraCredentials;
-    const credentialString = `${email}:${token}`;
-    const basicAuth = btoa(credentialString);
 
+    // Fetches projects through backend proxy (/projects endpoint)
     const fetchProjects = async () => {
       setLoading(true);
       setFetchError('');
@@ -36,28 +35,40 @@ function Dashboard({ jiraCredentials, onLogout, updateProjectContext, lastProjec
         updateProjectContext('', []);
       }
       try {
-        const apiUrl = `https://${domain}/rest/api/3/project/search?expand=lead,description,issueTypes`;
+        // Backend Proxy endpoint (should be on same-origin: otherwise use full URL if needed)
+        const apiUrl = '/projects';
         const resp = await fetch(apiUrl, {
-          method: 'GET',
+          method: 'POST',
           headers: {
-            'Authorization': `Basic ${basicAuth}`,
-            'Accept': 'application/json'
-          }
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ email, domain, token })
         });
+
         if (!resp.ok) {
+          // Try to parse reason from proxy or show generic error
+          let proxyError = 'Unable to fetch projects from Jira. Please retry or check your permissions.';
+          try {
+            const errObj = await resp.json();
+            if (errObj && errObj.error) {
+              proxyError = errObj.error + (errObj.detail ? ` (${Array.isArray(errObj.detail) ? errObj.detail.join("; ") : errObj.detail})` : '');
+            }
+          } catch {
+            // skip
+          }
           if (resp.status === 401 || resp.status === 403) {
             setFetchError('Project fetch failed: Authentication error. Your session may have expired or your credentials are invalid.');
             if (typeof onLogout === 'function') {
-              onLogout(); // Logout on authentication error (can't fetch projects)
+              onLogout();
               return;
             }
           } else {
-            setFetchError('Unable to fetch projects from Jira. Please retry or check your permissions.');
+            setFetchError(proxyError);
           }
           setProjects([]);
         } else {
           const data = await resp.json();
-          if (Array.isArray(data.values)) {
+          if (data && Array.isArray(data.values)) {
             setProjects(data.values);
             setFetchError('');
             if (typeof updateProjectContext === 'function') {
@@ -72,10 +83,10 @@ function Dashboard({ jiraCredentials, onLogout, updateProjectContext, lastProjec
           }
         }
       } catch (e) {
-        setFetchError('Unexpected error while fetching projects. Please check your connection or try again.');
+        setFetchError('Unexpected error while fetching projects. Please check your backend server, network connection, or try again.');
         setProjects([]);
         if (typeof updateProjectContext === 'function') {
-          updateProjectContext('Unexpected error while fetching projects. Please check your connection or try again.', []);
+          updateProjectContext('Unexpected error while fetching projects. Please check your backend server, network connection, or try again.', []);
         }
       }
       setLoading(false);

@@ -34,7 +34,7 @@ function App() {
   // PUBLIC_INTERFACE
   const toggleTheme = () => setTheme((theme) => (theme === 'light' ? 'dark' : 'light'));
 
-  // PUBLIC_INTERFACE: Handles logging in
+  // PUBLIC_INTERFACE: Handles logging in via backend proxy
   const handleLogin = async ({ email, domain, token }) => {
     setAuthState((prev) => ({
       authenticated: false,
@@ -55,39 +55,20 @@ function App() {
         }));
         return;
       }
-      const credentialString = `${email}:${token}`;
-      const basicAuth = btoa(credentialString);
-      const apiUrl = `https://${domain}/rest/api/3/myself`;
-
+      // Proxy endpoint - backend running at localhost:4000
+      const apiUrl = '/login'; // frontend uses proxy or needs setup, otherwise use http://localhost:4000/login
       let resp;
       try {
         resp = await fetch(apiUrl, {
-          method: 'GET',
+          method: 'POST',
           headers: {
-            'Authorization': `Basic ${basicAuth}`,
-            'Accept': 'application/json'
-          }
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ email, domain, token })
         });
       } catch (fetchErr) {
-        // Network, DNS, CORS, or browser-level error (e.g. CORS)
-        let message = 'Unexpected error occurred – could not connect to Jira.';
-        if (
-          typeof fetchErr === 'object' &&
-          fetchErr !== null &&
-          (
-            fetchErr.name === 'TypeError' || // most fetch CORS errors are TypeError
-            (typeof fetchErr.message === 'string' && (
-              fetchErr.message.includes('Failed to fetch') ||
-              fetchErr.message.includes('NetworkError') ||
-              fetchErr.message.includes('CORS')
-            ))
-          )
-        ) {
-          message = (
-            'Could not connect to Jira. This is often due to CORS restrictions: Jira does not allow direct requests to its API from browsers. ' +
-            'Try running this dashboard with a server-side proxy, or contact your administrator. Your network or firewall may also block external API access.'
-          );
-        }
+        // Network/connection/server unreachable, not a Jira or credentials error
+        let message = 'Could not connect to Jira Proxy backend server. Please ensure the backend service is running and reachable.';
         setAuthState((prev) => ({
           ...prev, authLoading: false, authenticated: false, credentials: null,
           authError: message,
@@ -96,45 +77,49 @@ function App() {
       }
 
       if (!resp) {
-        // Defensive: if fetch failed completely above
         setAuthState((prev) => ({
           ...prev, authLoading: false, authenticated: false, credentials: null,
-          authError: 'Could not send request to Jira.',
+          authError: 'Could not send request to backend Jira proxy.',
         }));
         return;
       }
 
       if (resp.ok) {
-        // Success!
+        // Success: authenticated!
         setAuthState({
           authenticated: true,
           authLoading: false,
           authError: '',
-          credentials: { email, domain, token }, // never persisted; only in memory
+          credentials: { email, domain, token }, // only in memory
         });
         setProjectState({
           lastProjectFetchError: '',
           lastProjectList: null,
         });
-      } else if (resp.status === 401 || resp.status === 403) {
-        setAuthState((prev) => ({
-          ...prev, authLoading: false,
-          authenticated: false,
-          authError: 'Invalid credentials: Email/token or domain is incorrect.',
-          credentials: null,
-        }));
       } else {
+        // Try to extract readable error, else fallback
+        let errorMsg = 'Could not authenticate – check your Jira domain, API token, and internet connection.';
+        try {
+          const errObj = await resp.json();
+          if (errObj && errObj.error) {
+            errorMsg = errObj.error + (errObj.detail ? ` (${Array.isArray(errObj.detail) ? errObj.detail.join("; ") : errObj.detail})` : "");
+          }
+        } catch {
+          // ignore parsing error, fallback on generic message
+        }
         setAuthState((prev) => ({
-          ...prev, authLoading: false, authenticated: false, credentials: null,
-          authError: 'Could not authenticate – check your Jira domain and internet connection.',
+          ...prev,
+          authLoading: false,
+          authenticated: false,
+          authError: errorMsg,
+          credentials: null,
         }));
       }
     } catch (e) {
-      // Code-level or additional unknown error
       setAuthState((prev) => ({
         ...prev, authLoading: false, authenticated: false, credentials: null,
         authError: (
-          'Unexpected error occurred – could not connect to Jira. ' +
+          'Unexpected error occurred – could not connect to backend proxy. ' +
           (e && e.message ? `(${e.message})` : '')
         ),
       }));
